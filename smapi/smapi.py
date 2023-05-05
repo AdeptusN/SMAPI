@@ -19,7 +19,7 @@ import modules.transforms as custom_transforms
 from utils import prepare_image_for_segmentation, clean_image_by_mask, to_image_from_decoder
 
 
-class SMv1:
+class SmapiPipeline:
     """
     Class for SM model
     """
