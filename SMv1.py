@@ -11,12 +11,26 @@ from basicsr.utils.download_util import load_file_from_url
 
 from realesrgan import RealESRGANer
 
+from models import load_model
 from models.unet_autoencoder import UNetAutoencoder
 from models.segmentation import UNet
 import modules.transforms as custom_transforms
-# TODO: разобраться с utils
-from LookGenerator.datasets.utils import prepare_image_for_segmentation, clean_image_by_mask, to_image_from_decoder
-from LookGenerator.networks.utils import load_model
+
+from utils import prepare_image_for_segmentation, clean_image_by_mask, to_image_from_decoder
+
+
+class SMv1:
+    """
+    Class for SM model
+    """
+    def __init__(self):
+        pass
+
+    def load_models(self, weights_dir: str):
+        pass
+
+    def process_image(self):
+        pass
 
 
 # TODO: разобраться со структурой SMv1
@@ -38,7 +52,7 @@ def load_models(weights_dir: str) -> Dict:
     models = dict()
 
     segmentation_model = UNet(in_channels=3, out_channels=1)
-    encoder_decoder_model = EncoderDecoder(in_channels=6, out_channels=3)
+    encoder_decoder_model = UNetAutoencoder(in_channels=6, out_channels=3)
 
     models["segmentation"] = load_model(segmentation_model, os.path.join(weights_dir, "segmentation.pt"))
     models["encoder_decoder"] = load_model(encoder_decoder_model, os.path.join(weights_dir, "encoder_decoder.pt"))
@@ -69,11 +83,6 @@ def process_image(human_image: Image, clothes_image: Image, models: Dict, upscal
         Return:
             Human image with new clothes.
     """
-
-    """"""
-
-    from torchvision.utils import save_image
-
     transform_human = transforms.Compose([
         transforms.Resize((256, 192)),
         custom_transforms.Normalize()
