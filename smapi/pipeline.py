@@ -29,6 +29,7 @@ class SmapiPipeline:
     Class for SM model
     """
     def __init__(self, logger=None):
+
         self.config = Config()
         if not logger:
             self.logger = logging.Logger(__name__)
@@ -42,16 +43,20 @@ class SmapiPipeline:
             
         else:
             self.logger=logger
+        
+
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.logger.info(f'Device: {self.device}') 
 
         self._load_models()
 
     def _load_models(self):
         WEIGHTS_DIR = self.config.WEIGHTS_DIR
         if WEIGHTS_DIR is None or not os.access(WEIGHTS_DIR, os.F_OK):            
-            self.logger.info("Can't access WEIGHTS_DIR. Working in default weight directory")
+            self.logger.info("Can't access WEIGHTS_DIR. Load from default weight directory")
             WEIGHTS_DIR = os.path.join(os.getcwd(), 'weights')
         
-        self.logger.info(f"Working in {WEIGHTS_DIR}")
+        self.logger.info(f"Load weights from {WEIGHTS_DIR}")
 
         try:
             self.logger.info("Loading weights")
@@ -85,7 +90,11 @@ class SmapiPipeline:
             scale=4,
             model_path=os.path.join(weights_dir, "unsampler.pth"),
             model=unsampler,
+            device=self.device
         )
+
+        self.segmentation.to(self.device)
+        self.encoder_decoder.to(self.device) 
         self.logger.info('RealESRGAN model loaded')
 
     def _download_weights(self , weights_dir: str): 
