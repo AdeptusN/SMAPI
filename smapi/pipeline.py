@@ -22,7 +22,6 @@ from .utils.download import download
 from .utils.image_processing import prepare_image_for_segmentation, clean_image_by_mask
 from .utils.models import load_model
 
-config = Config()
 
 
 class SmapiPipeline:
@@ -30,22 +29,24 @@ class SmapiPipeline:
     Class for SM model
     """
     def __init__(self, logger=None):
-        if logger is None:
+        self.config = Config()
+        if not logger:
             self.logger = logging.Logger(__name__)
             self.logger.setLevel(logging.INFO)
-        
+
             ch = logging.StreamHandler()
             ch.setLevel(logging.INFO)
-    
+            formatter = logging.Formatter('%(name)-12s: %(message)s')
+            ch.setFormatter(formatter)
             self.logger.addHandler(ch)
-    
+            
         else:
             self.logger=logger
 
         self._load_models()
 
     def _load_models(self):
-        WEIGHTS_DIR = config.WEIGHTS_DIR
+        WEIGHTS_DIR = self.config.WEIGHTS_DIR
         if WEIGHTS_DIR is None or not os.access(WEIGHTS_DIR, os.F_OK):            
             self.logger.info("Can't access WEIGHTS_DIR. Working in default weight directory")
             WEIGHTS_DIR = os.path.join(os.getcwd(), 'weights')
@@ -67,20 +68,25 @@ class SmapiPipeline:
 
     def _load_models_from_files(self, weights_dir):    
         # prepare models
-        segmentation_model = UNet(in_channels=3, out_channels=3)
-        enocder_decoder_model = UNetAutoencoder(in_channels=6, out_channels=3)
+        segmentation_model = UNet(in_channels=3, out_channels=1)
+        encoder_decoder_model = UNetAutoencoder(in_channels=6, out_channels=3)
         unsampler = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
         
         # load weights
         self.segmentation = load_model(segmentation_model,
                 os.path.join(weights_dir, "segmentation.pt"))
+        self.logger.info('Segmentation model loaded')
+
         self.encoder_decoder = load_model(encoder_decoder_model,
                 os.path.join(weights_dir, "encoder_decoder.pt"))
+        self.logger.info('Encoder-decoder model loaded')
+
         self.unsampler =  RealESRGANer(
-            scale=netscale,
+            scale=4,
             model_path=os.path.join(weights_dir, "unsampler.pth"),
-            model=model,
+            model=unsampler,
         )
+        self.logger.info('RealESRGAN model loaded')
 
     def _download_weights(self , weights_dir: str): 
         models_to_download = ["segmentation.pt", "encoder_decoder.pt",
@@ -94,7 +100,7 @@ class SmapiPipeline:
             download(url, file_path)
         return True
 
-    def process(self, human_image: Image, clothes_image: Image, models: Dict, upscale=True) -> Image:
+    def process(self, human_image: Image, clothes_image: Image, upscale=True) -> Image:
         """
             Params:
                 human_image: Source image of human
@@ -110,13 +116,19 @@ class SmapiPipeline:
 
         transform_human = transforms.Compose([
             transforms.Resize((256, 192)),
-            custom_transforms.Normalize()
+            transforms.Normalize(
+                mean=[0.5, 0.5, 0.5],
+                std=[0.25, 0.25, 0.25]
+                )
         ])
 
         transform_clothes = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((256, 192)),
-            custom_transforms.Normalize()
+            transforms.Normalize(
+                mean=[0.5, 0.5, 0.5],
+                std=[0.25, 0.25, 0.25]
+                )
         ])
 
         transform_segmented = transforms.Compose([
@@ -141,7 +153,6 @@ class SmapiPipeline:
             result_image = Image.fromarray(super_resolution)     
         else:
             t = transforms.ToPILImage()
-            result_image = t(encoded_image)
-
+            result_image = t(encoded_image[0])
         return result_image
 
